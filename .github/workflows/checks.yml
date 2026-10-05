@@ -1,0 +1,39 @@
+name: Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PR title follows conventional format
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "Title: $PR_TITLE"
+          if ! echo "$PR_TITLE" | grep -Eq '^(feat|fix|docs|chore|refactor|test|merge)(\(.+\))?: .+'; then
+            echo "::error::PR title must look like 'type: description' (feat, fix, docs, chore, refactor, test)"
+            exit 1
+          fi
+
+      - name: No leftover conflict markers
+        run: |
+          if git grep -nE '^(<<<<<<< |>>>>>>> |=======$)' -- . ':!docs' ':!scripts' ':!.github' ':!CONTRIBUTING.md' ':!README.md'; then
+            echo "::error::Conflict markers found. Resolve them before opening the PR."
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: config.json is valid JSON
+        run: python -m json.tool config.json > /dev/null
+
+      - name: Python files compile
+        run: python -m compileall -q app scripts exercises
